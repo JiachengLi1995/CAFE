@@ -23,4 +23,6 @@ CUDA_VISIBLE_DEVICES=$1 python3.7 large_gpu.py \
     --trm_num_blocks 2  \
     --trm_num_heads 1 \
     --verbose 10 \
-    --model_code 'fdsa'
+    --local_num_heads 0 \
+    --model_code 'cafe' \
+    #--eval_all

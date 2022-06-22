@@ -4,7 +4,7 @@ import torch
 from torch import nn as nn
 
 from src.utils.utils import fix_random_seed_as
-
+from src.models.local_sasrec import LocalSelfAttention
 
 class PointWiseFeedForward(torch.nn.Module):
     def __init__(self, hidden_units, dropout_rate):
@@ -109,11 +109,12 @@ class Embedding(nn.Module):
         self.pos_emb = torch.nn.Embedding(args.trm_max_len, args.trm_hidden_dim)
         self.emb_dropout = torch.nn.Dropout(p=args.trm_dropout)
 
-    def forward(self, log_seqs):
+    def forward(self, log_seqs, is_pos=True):
         seqs = self.lookup_input(log_seqs)
-        seqs *= self.args.trm_hidden_dim ** 0.5
-        positions = torch.arange(log_seqs.shape[1]).long().unsqueeze(0).repeat([log_seqs.shape[0], 1])
-        seqs = seqs + self.pos_emb(positions.to(seqs.device))
+        if is_pos:
+            seqs *= self.args.trm_hidden_dim ** 0.5
+            positions = torch.arange(log_seqs.shape[1]).long().unsqueeze(0).repeat([log_seqs.shape[0], 1])
+            seqs = seqs + self.pos_emb(positions.to(seqs.device))
         seqs = self.emb_dropout(seqs)
 
         timeline_mask = (log_seqs == self.pad_token).bool()
@@ -137,7 +138,7 @@ class Embedding(nn.Module):
 
 
 
-class CFRecModel(nn.Module):
+class CFRecLocalJointModel(nn.Module):
     def __init__(self, args, pretrained_item_vectors=None):
         super().__init__()
         self.args = args
@@ -152,11 +153,11 @@ class CFRecModel(nn.Module):
         self.product_embedding = Embedding(self.num_items, args, args.pad_token, pretrained_item_vectors, args.use_pretrained_vectors)
         self.category_embedding = Embedding(self.num_meta, args, args.meta_pad_token, use_pretrained_vectors=False)
 
-        self.product_attention = SelfAttention(args)
+        self.product_attention = LocalSelfAttention(args)
         self.category_attention = SelfAttention(args)
-        self.mlp = nn.Linear(args.trm_hidden_dim * 2, args.trm_hidden_dim)
 
         self.use_pretrained_vectors = args.use_pretrained_vectors
+        self.meta2item = torch.LongTensor(args.meta2item)
                 
     def forward(self, 
                 tokens, 
@@ -168,12 +169,12 @@ class CFRecModel(nn.Module):
                 ):
 
         idx1, idx2 = self.select_predict_index(tokens) if mode == "train" else (torch.arange(tokens.size(0)), length.squeeze())
-        feature, time_mask = self.product_embedding(tokens)
+        feature, time_mask = self.product_embedding(tokens, is_pos=True)
         meta_feature, meta_time_mask = self.category_embedding(meta_tokens)
 
         meta_feature, meta_attn_weights = self.category_attention(meta_feature, meta_time_mask)
         feature, attn_weights = self.product_attention(feature, time_mask)
-        feature = feature + meta_feature#self.mlp(torch.cat([feature, meta_feature], dim=-1))
+        feature = feature + meta_feature
         
         feature = feature[idx1, idx2]
         meta_feature = meta_feature[idx1, idx2]
@@ -222,8 +223,9 @@ class CFRecModel(nn.Module):
                 logits_meta = torch.bmm(log_feats, w).squeeze(1) # (batch_size, candidates)
             else:
                 logits_meta = self.category_embedding.all_predict(meta_feature)
+                logits_meta = logits_meta[:, self.meta2item]
             
-            return logits, logits_meta
+            return logits + logits_meta, logits_meta
         
 
     def select_predict_index(self, x):
