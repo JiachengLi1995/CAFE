@@ -31,7 +31,7 @@ If you have any questions related to the code or the paper, feel free to email J
 
 # Citation
 
-Please cite our paper if you use UCTopic in your work:
+Please cite our paper if you use CAFE in your work:
 
 ```bibtex
 @article{Li2022CoarsetoFineSS,
