@@ -37,8 +37,7 @@ Please cite our paper if you use CAFE in your work:
 @article{Li2022CoarsetoFineSS,
   title={Coarse-to-Fine Sparse Sequential Recommendation},
   author={Jiacheng Li and Tong Zhao and Jin Li and Jim Chan and Christos Faloutsos and George Karypis and Soo-Min Pantel and Julian McAuley},
-  journal={ArXiv},
-  year={2022},
-  volume={abs/2204.01839}
+  journal={Proceedings of the 45th International ACM SIGIR Conference on Research and Development in Information Retrieval},
+  year={2022}
 }
 ```
